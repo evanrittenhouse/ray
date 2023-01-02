@@ -287,6 +287,11 @@ class TestParsedRuntimeEnv:
 
         del os.environ["RAY_RUNTIME_ENV_LOCAL_DEV_MODE"]
 
+    def test_ray_with_virtualenv(self, tmpdir_factory):
+        fake_directory = tmpdir_factory.mktemp("./virtualenv")
+        result = RuntimeEnv(pip=fake_directory)
+        assert result
+
 
 class TestParseJobConfig:
     def test_parse_runtime_env_from_json_env_variable(self):

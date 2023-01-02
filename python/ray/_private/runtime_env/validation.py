@@ -110,7 +110,10 @@ def parse_and_validate_pip(pip: Union[str, List[str], Dict]) -> Optional[Dict]:
         1) A List[str] describing the requirements. This is passed through.
         2) A string pointing to a local requirements file. In this case, the
            file contents will be read split into a list.
-        3) A python dictionary that has three fields:
+        3) A venv directory with packages already installed. This will allow
+           future calls to avoid package conflicts and prevent reinstallation of
+           complex/large packages.
+        4) A python dictionary that has three fields:
             a) packages (required, List[str]): a list of pip packages, it same as 1).
             b) pip_check (optional, bool): whether to enable pip check at the end of pip
                install, default to False.
@@ -125,11 +128,15 @@ def parse_and_validate_pip(pip: Union[str, List[str], Dict]) -> Optional[Dict]:
     """
     assert pip is not None
 
-    def _handle_local_pip_requirement_file(pip_file: str):
+    def _handle_local_pip_requirements(pip_file: str):
         pip_path = Path(pip_file)
-        if not pip_path.is_file():
-            raise ValueError(f"{pip_path} is not a valid file")
-        return pip_path.read_text().strip().split("\n")
+        if not (pip_path.is_file() or pip_path.is_dir()):
+            raise FileNotFoundError(f"{pip_path} is not a valid file")
+
+        if pip_path.is_file():
+            return pip_path.read_text().strip().split("\n")
+        else:
+            return ""
 
     result = None
     if sys.platform == "win32":
@@ -140,7 +147,7 @@ def parse_and_validate_pip(pip: Union[str, List[str], Dict]) -> Optional[Dict]:
         )
     if isinstance(pip, str):
         # We have been given a path to a requirements.txt file.
-        pip_list = _handle_local_pip_requirement_file(pip)
+        pip_list = _handle_local_pip_requirements(pip)
         result = dict(packages=pip_list, pip_check=False)
     elif isinstance(pip, list) and all(isinstance(dep, str) for dep in pip):
         result = dict(packages=pip, pip_check=False)
@@ -170,7 +177,7 @@ def parse_and_validate_pip(pip: Union[str, List[str], Dict]) -> Optional[Dict]:
                 f"runtime_env['pip'] must include field 'packages', but got {pip}"
             )
         elif isinstance(pip["packages"], str):
-            result["packages"] = _handle_local_pip_requirement_file(pip["packages"])
+            result["packages"] = _handle_local_pip_requirements(pip["packages"])
         elif not isinstance(pip["packages"], list):
             raise ValueError(
                 "runtime_env['pip']['packages'] must be of type str of list, "

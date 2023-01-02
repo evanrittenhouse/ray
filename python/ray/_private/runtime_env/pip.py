@@ -336,15 +336,21 @@ with open(r"{ray_version_path}", "wt") as f:
 
         await check_output_cmd(pip_install_cmd, logger=logger, cwd=cwd, env=pip_env)
 
-    async def _run(self):
+    async def _run(self) -> None:
         path = self._target_dir
         logger = self._logger
-        pip_packages = self._pip_config["packages"]
         # We create an empty directory for exec cmd so that the cmd will
         # run more stable. e.g. if cwd has ray, then checking ray will
         # look up ray in cwd instead of site packages.
         exec_cwd = os.path.join(path, "exec_cwd")
         os.makedirs(exec_cwd, exist_ok=True)
+
+        # if there are no pip packages to install due to a virtualenv folder,
+        # we can skip trying to install
+        pip_packages = self._pip_config["packages"]
+        if not pip_packages:
+            return
+
         try:
             await self._create_or_get_virtualenv(path, exec_cwd, logger)
             python = _PathHelper.get_virtualenv_python(path)
@@ -357,6 +363,7 @@ with open(r"{ray_version_path}", "wt") as f:
                     self._pip_env,
                     logger,
                 )
+
                 # Install pip packages.
                 await self._install_pip_packages(
                     path,
